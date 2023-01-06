@@ -8,6 +8,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import IO, List
 
+from rich.console import Console, Group
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
+
 from aws_cpt.iam_structs import glob_match, in_glob
 from aws_cpt.modules.gather_assume_role import extract_trust_policy
 from aws_cpt.modules.gather_permissions_for_role import extract_permissions
@@ -181,19 +186,21 @@ def main(args: List[str]):
                     (allow_perms, privesc_perms, privesc_check)
                 )
 
+    console = Console(file=output_io)
+    root = Tree("Privilege Escalation Tree")
+
     for privileged_role, checks in privileged_roles.items():
-        output_io.write(f"- {privileged_role}\n")
+        tree_role = root.add(privileged_role)
 
         for allow_perms, actions, privesc_check in checks:
             privesc_perms = privesc_check["perms"]
             privesc_principal = privesc_check.get("trusted_principal")
 
-            output_io.write(
-                f"  \_ Privilege Escalation: ({', '.join(privesc_perms)})\n"
+            tree_privesc = tree_role.add(
+                f"Privilege Escalation: ({', '.join(privesc_perms)})"
             )
-
             for action in actions:
-                output_io.write(f"    \_ Action: {action}\n")
+                tree_action = tree_privesc.add(f"Action: {action}")
 
                 if p := allow_perms.get(action):
                     rsrcs = p if isinstance(p, list) else [p]
@@ -206,7 +213,7 @@ def main(args: List[str]):
                     )
 
                 for r in rsrcs:
-                    output_io.write(f"      \_ Resource: {r}\n")
+                    principal_group = []
                     if action == "iam:PassRole" and privesc_principal:
                         if (condition_str := " (Condition: ") in r:
                             r, _, cond = r.partition(condition_str)
@@ -246,16 +253,22 @@ def main(args: List[str]):
                             p = ":".join(p.split(":")[5:]) if ":" in p else p
                             if glob_match(r, p):
                                 if p.strip("role/") in privileged_roles:
-                                    output_io.write(f"        \_ {p} (privileged)\n")
+                                    principal_group.append(
+                                        Text(f"{p} (privileged)", style="red")
+                                    )
                                 elif args.verbose:
-                                    output_io.write(f"        \_ {p}\n")
+                                    principal_group.append(f"{p}")
 
                     elif r != "*" and glob_match("iam:*RolePolicy", action):
                         for d in data["RoleDetailList"]:
                             d = ":".join(d["Arn"].split(":")[5:])
                             if glob_match(r, d):
-                                output_io.write(f"        \_ {d}\n")
-                output_io.write("\n")
+                                principal_group.append(f"{p}")
+
+                    tree_resource = tree_action.add(f"Resource: {r}")
+                    tree_resource.add(Group(*principal_group))
+
+    console.print(root)
 
 
 if __name__ == "__main__":

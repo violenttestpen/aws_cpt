@@ -81,6 +81,7 @@ def process_iam_actions(statements, verbose=False, reverse=False):
 
         for effect, perms in overall_perms.items():
             for k, v in perms.items():
+                v = v if isinstance(v, list) else [v]
                 for new_k in v:
                     reverse_perms[effect][new_k].add(k)
 

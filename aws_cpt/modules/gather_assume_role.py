@@ -8,6 +8,10 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, List, Tuple
 
+from rich.console import Console, Group
+from rich.table import Table
+from rich.tree import Tree
+
 from aws_cpt.iam_structs import IAMDocument, Policy, Role
 
 
@@ -56,34 +60,18 @@ def main(args: List[str]):
                     (principal, rsrcs, stmt.get("Condition"))
                 )
 
-        try:
-            from rich.console import Console, Group
-            from rich.table import Table
-            from rich.tree import Tree
+        console = Console(file=output_io)
+        root = Tree("AssumeRole Policy Tree")
 
-            console = Console(file=output_io)
-            root = Tree("AssumeRole Policy Tree")
+        for principal_type, principal_pairs in table_data.items():
+            tree_type = root.add(principal_type)
+            for principal, rsrcs, conditions in principal_pairs:
+                rsrc_grp = tree_type.add(principal).add(Group(*rsrcs))
+                if conditions:
+                    for k, v in conditions.items():
+                        rsrc_grp.add(f"Condition: {k} = {v}")
 
-            for principal_type, principal_pairs in table_data.items():
-                tree_type = root.add(principal_type)
-                for principal, rsrcs, conditions in principal_pairs:
-                    rsrc_grp = tree_type.add(principal).add(Group(*rsrcs))
-                    if conditions:
-                        for k, v in conditions.items():
-                            rsrc_grp.add(f"Condition: {k} = {v}")
-
-            console.print(root)
-        except ImportError:
-            for principal_type, principal_pairs in table_data.items():
-                output_io.write(principal_type + "\n")
-                output_io.write("=" * len(principal_type) + "\n")
-                for principal, rsrcs, conditions in principal_pairs:
-                    output_io.write(f"- {principal}\n")
-                    output_io.write("\n".join(f"  \_ {r}" for r in rsrcs) + "\n")
-                    if conditions:
-                        for k, v in conditions.items():
-                            output_io.write(f"    \_ Condition: {k} = {v}\n")
-                    output_io.write("\n")
+        console.print(root)
 
 
 if __name__ == "__main__":
