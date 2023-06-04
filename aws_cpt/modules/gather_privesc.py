@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import IO, List
 
 from rich.console import Console, Group
-from rich.table import Table
+from rich.progress import Progress
 from rich.text import Text
 from rich.tree import Tree
 
 from aws_cpt.iam_structs import glob_match, in_glob
+from aws_cpt.modules import create_new_argparser
 from aws_cpt.modules.gather_assume_role import extract_trust_policy
 from aws_cpt.modules.gather_permissions_for_role import extract_permissions
 
@@ -166,25 +167,32 @@ def main(args: List[str]):
     input_io = Path(args.input).open("rb") if args.input else sys.stdin.buffer
     output_io = Path(args.output).open("w") if args.output else sys.stdout
 
-    data = input_io.read()
-    data = json.loads(data)
+    data = json.load(input_io)
+    input_io.close()
 
     statements = extract_trust_policy(data)
 
     roles = [r["RoleName"] for r in data["RoleDetailList"]]
     privileged_roles = defaultdict(list)
-    for role in roles:
-        allow_perms, _ = extract_permissions(role, data)
-        for privesc_check in privesc_checks:
-            privesc_perms = set(privesc_check["perms"])
-            privesc_principal = privesc_check.get("trusted_principal")
 
-            if (actions := set(privesc_perms)) == (
-                actions & set(allow_perms.keys())
-            ) or all(in_glob(set(allow_perms.keys()), p) for p in privesc_perms):
-                privileged_roles[role].append(
-                    (allow_perms, privesc_perms, privesc_check)
-                )
+    with Progress(console=Console(file=sys.stderr)) as progress:
+        task = progress.add_task(
+            "[red]Analysing roles for known privilege escalations...",
+            total=len(roles) * len(privesc_checks),
+        )
+        for role in roles:
+            allow_perms, _ = extract_permissions(role, data)
+            for privesc_check in privesc_checks:
+                privesc_perms = privesc_check["perms"]
+                privesc_principal = privesc_check.get("trusted_principal")
+
+                if (actions := set(privesc_perms)) == (
+                    actions & set(allow_perms.keys())
+                ) or all(in_glob(set(allow_perms.keys()), p) for p in privesc_perms):
+                    privileged_roles[role].append(
+                        (allow_perms, privesc_perms, privesc_check)
+                    )
+                progress.update(task, advance=1)
 
     console = Console(file=output_io)
     root = Tree("Privilege Escalation Tree")
@@ -218,11 +226,13 @@ def main(args: List[str]):
                         if (condition_str := " (Condition: ") in r:
                             r, _, cond = r.partition(condition_str)
                             cond = eval(cond[:-1])
-                            iamPTS = "iam:PassedToService"
                             svcs = [
-                                cond.get("StringEquals", {}).get(iamPTS, []),
-                                cond.get("StringLike", {}).get(iamPTS, []),
-                                cond.get("StringEqualsIfExists", {}).get(iamPTS, []),
+                                cond.get(cond_check, {}).get("iam:PassedToService", [])
+                                for cond_check in (
+                                    "StringEquals",
+                                    "StringLike",
+                                    "StringEqualsIfExists",
+                                )
                             ]
 
                             passed_to_svcs = []
@@ -263,7 +273,7 @@ def main(args: List[str]):
                         for d in data["RoleDetailList"]:
                             d = ":".join(d["Arn"].split(":")[5:])
                             if glob_match(r, d):
-                                principal_group.append(f"{p}")
+                                principal_group.append(d)
 
                     tree_resource = tree_action.add(f"Resource: {r}")
                     tree_resource.add(Group(*principal_group))
@@ -272,24 +282,7 @@ def main(args: List[str]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--input",
-        "-i",
-        help="The filepath to the output of `iam get-account-authorization-details`",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        help="The filepath to save the results",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        default=False,
-        action="store_true",
-        help="Verbose mode",
-    )
+    parser = create_new_argparser()
     args = parser.parse_args()
 
     main(args)

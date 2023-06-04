@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, List, Tuple
 
 from aws_cpt.iam_structs import IAMDocument, Policy, PolicyStatement, Role
+from aws_cpt.modules import create_new_argparser
 
 
 def parse_iam(data: object) -> Tuple[List[Role], List[Policy]]:
@@ -59,22 +60,22 @@ def process_iam_actions(statements, verbose=False, reverse=False):
                 if action.partition(":")[0] not in service_wildcards
             }
 
-            # Collapse resource list if there's only 1 resource
-            perms = {
-                action: rsrc if len(rsrc) > 1 else rsrc[0]
-                for action, rsrc in perms.items()
-            }
-
             # Subsume resource wildcard
             perms = {
-                action: "*" if isinstance(rsrc, list) and "*" in rsrc else rsrc
+                action: ["*"] if "*" in rsrcs else rsrcs
+                for action, rsrcs in perms.items()
+            }
+
+            # Collapse resource list if there's only 1 resource
+            perms = {
+                action: rsrc[0] if len(rsrc) == 1 else rsrc
                 for action, rsrc in perms.items()
             }
 
             for svc in service_wildcards:
                 perms.update({f"{svc}:*": "*"})
 
-        overall_perms[effect] = {k: perms[k] for k in sorted(perms.keys())}
+        overall_perms[effect] = {k: perms[k] for k in sorted(perms)}
 
     if reverse:
         reverse_perms = {"Allow": defaultdict(set), "Deny": defaultdict(set)}
@@ -96,7 +97,10 @@ def process_iam_actions(statements, verbose=False, reverse=False):
 def extract_permissions(role_name: str, data: Any, verbose=False, reverse=False):
     roles, policies = parse_iam(data)
 
-    (role,) = [r for r in roles if r.RoleName == role_name]
+    if not any(role_candidates := [r for r in roles if r.RoleName == role_name]):
+        return {}, {}
+
+    (role,) = role_candidates
     attached_policies_arns = [p["PolicyArn"] for p in role.AttachedManagedPolicies]
     attached_policies = (p for p in policies if p.Arn in attached_policies_arns)
 
@@ -139,24 +143,7 @@ def main(args: List[str]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--input",
-        "-i",
-        help="The filepath to the output of `iam get-account-authorization-details`",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        help="The filepath to save the results",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        default=False,
-        action="store_true",
-        help="Verbose mode",
-    )
+    parser = create_new_argparser()
     parser.add_argument(
         "--reverse",
         "-r",

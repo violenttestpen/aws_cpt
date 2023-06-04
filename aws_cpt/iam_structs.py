@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import IO, Dict, List, Tuple
@@ -8,12 +9,18 @@ DATE_FORMAT = r"%Y-%m-%dT%H:%M:%SZ"
 
 
 def glob_match(pattern: str, data: str) -> bool:
-    pattern_parts = pattern.split("*")
-    while pattern_parts:
-        if (pattern_part := pattern_parts.pop(0)) not in data:
+    pattern, data = pattern.lower(), data.lower()
+
+    if "*" not in pattern:
+        return pattern == data
+
+    index = 0
+    while "*" in pattern:
+        pattern_part, _, pattern = pattern.partition("*")
+        if (index := data.find(pattern_part, index)) == -1:
             return False
-        index = data.index(pattern_part)
-        data = data[index + len(pattern_part) :]
+        index += len(pattern_part)
+
     return True
 
 

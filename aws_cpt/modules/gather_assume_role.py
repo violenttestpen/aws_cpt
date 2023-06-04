@@ -6,13 +6,13 @@ import sys
 from collections import defaultdict
 from itertools import chain
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from rich.console import Console, Group
-from rich.table import Table
 from rich.tree import Tree
 
 from aws_cpt.iam_structs import IAMDocument, Policy, Role
+from aws_cpt.modules import create_new_argparser
 
 
 def parse_iam(data: object) -> Tuple[List[Role], List[Policy]]:
@@ -20,7 +20,7 @@ def parse_iam(data: object) -> Tuple[List[Role], List[Policy]]:
     return iam_document.RoleDetailList, iam_document.Policies
 
 
-def extract_trust_policy(data: object):
+def extract_trust_policy(data: object) -> Dict[str, dict]:
     roles, _ = parse_iam(data)
     statements = defaultdict(dict)
 
@@ -29,15 +29,14 @@ def extract_trust_policy(data: object):
             for principal in assume_role_stmt.Principal:
                 stmt = statements[principal.Name]
                 stmt["Type"] = principal.Type
-                actions = stmt.get("Actions", defaultdict(dict))
-                for action in assume_role_stmt.Action:
-                    resources = actions[assume_role_stmt.Effect].get(action, [])
-                    resources.append(r.Arn)
-                    actions[assume_role_stmt.Effect][action] = resources
-                stmt["Actions"] = actions
                 stmt["Condition"] = assume_role_stmt.Condition
 
-    return {k: statements[k] for k in sorted(statements.keys())}
+                actions = stmt.get("Actions", defaultdict(lambda: defaultdict(list)))
+                for action in assume_role_stmt.Action:
+                    actions[assume_role_stmt.Effect][action].append(r.Arn)
+                stmt["Actions"] = actions
+
+    return {k: statements[k] for k in sorted(statements)}
 
 
 def main(args: List[str]):
@@ -75,24 +74,7 @@ def main(args: List[str]):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--input",
-        "-i",
-        help="The filepath to the output of `iam get-account-authorization-details`",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        help="The filepath to save the results",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        default=False,
-        action="store_true",
-        help="Verbose mode",
-    )
+    parser = create_new_argparser()
     args = parser.parse_args()
 
     main(args)
