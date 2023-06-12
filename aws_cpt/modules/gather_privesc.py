@@ -4,9 +4,8 @@ import argparse
 import json
 import sys
 from collections import defaultdict
-from io import BytesIO
 from pathlib import Path
-from typing import IO, List
+from typing import List
 
 from rich.console import Console, Group
 from rich.progress import Progress
@@ -173,7 +172,7 @@ def main(args: List[str]):
     statements = extract_trust_policy(data)
 
     roles = [r["RoleName"] for r in data["RoleDetailList"]]
-    privileged_roles = defaultdict(list)
+    priv_roles = defaultdict(list)
 
     with Progress(console=Console(file=sys.stderr)) as progress:
         task = progress.add_task(
@@ -189,15 +188,12 @@ def main(args: List[str]):
                 if (actions := set(privesc_perms)) == (
                     actions & set(allow_perms.keys())
                 ) or all(in_glob(set(allow_perms.keys()), p) for p in privesc_perms):
-                    privileged_roles[role].append(
-                        (allow_perms, privesc_perms, privesc_check)
-                    )
+                    priv_roles[role].append((allow_perms, privesc_perms, privesc_check))
                 progress.update(task, advance=1)
 
-    console = Console(file=output_io)
     root = Tree("Privilege Escalation Tree")
 
-    for privileged_role, checks in privileged_roles.items():
+    for privileged_role, checks in priv_roles.items():
         tree_role = root.add(privileged_role)
 
         for allow_perms, actions, privesc_check in checks:
@@ -262,7 +258,7 @@ def main(args: List[str]):
                         for p in principals:
                             p = ":".join(p.split(":")[5:]) if ":" in p else p
                             if glob_match(r, p):
-                                if p.strip("role/") in privileged_roles:
+                                if p.strip("role/") in priv_roles:
                                     principal_group.append(
                                         Text(f"{p} (privileged)", style="red")
                                     )
@@ -278,7 +274,7 @@ def main(args: List[str]):
                     tree_resource = tree_action.add(f"Resource: {r}")
                     tree_resource.add(Group(*principal_group))
 
-    console.print(root)
+    Console(file=output_io).print(root)
 
 
 if __name__ == "__main__":

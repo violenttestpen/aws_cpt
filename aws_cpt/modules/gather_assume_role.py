@@ -53,13 +53,11 @@ def main(args: List[str]):
     else:
         table_data = defaultdict(list)
         for principal, stmt in statements.items():
-            allowed_rsrcs = stmt["Actions"].get("Allow", {})
-            for rsrcs in allowed_rsrcs.values():
+            for rsrcs in stmt["Actions"].get("Allow", {}).values():
                 table_data[stmt["Type"]].append(
                     (principal, rsrcs, stmt.get("Condition"))
                 )
 
-        console = Console(file=output_io)
         root = Tree("AssumeRole Policy Tree")
 
         for principal_type, principal_pairs in table_data.items():
@@ -70,7 +68,7 @@ def main(args: List[str]):
                     for k, v in conditions.items():
                         rsrc_grp.add(f"Condition: {k} = {v}")
 
-        console.print(root)
+        Console(file=output_io).print(root)
 
 
 if __name__ == "__main__":

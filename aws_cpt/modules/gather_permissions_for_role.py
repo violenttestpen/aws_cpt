@@ -18,17 +18,17 @@ def parse_iam(data: object) -> Tuple[List[Role], List[Policy]]:
 
 
 def process_iam_actions(statements, verbose=False, reverse=False):
-    overall_perms = {"Allow": defaultdict(set), "Deny": defaultdict(set)}
+    overall_perms = defaultdict(lambda: defaultdict(set))
     for perm in statements:
         if not isinstance(perm, PolicyStatement):
             print("Error processing:", perm)
             continue
 
-        not_resource = [f"~{nr}" for nr in perm.NotResource]
+        not_resource = (f"~{nr}" for nr in perm.NotResource)
         k, v = perm.Action, [*chain(perm.Resource, not_resource)]
 
         if condition := perm.Condition:
-            v = [f"{r} (Condition: {condition})" for r in v]
+            v = (f"{r} (Condition: {condition})" for r in v)
 
         for key in k:
             overall_perms[perm.Effect][key] |= set(v)
@@ -78,12 +78,11 @@ def process_iam_actions(statements, verbose=False, reverse=False):
         overall_perms[effect] = {k: perms[k] for k in sorted(perms)}
 
     if reverse:
-        reverse_perms = {"Allow": defaultdict(set), "Deny": defaultdict(set)}
+        reverse_perms = defaultdict(lambda: defaultdict(set))
 
         for effect, perms in overall_perms.items():
             for k, v in perms.items():
-                v = v if isinstance(v, list) else [v]
-                for new_k in v:
+                for new_k in v if isinstance(v, list) else [v]:
                     reverse_perms[effect][new_k].add(k)
 
         overall_perms = {
@@ -138,8 +137,6 @@ def main(args: List[str]):
         output_io.write("\n\n")
         output_io.write("Deny:\n")
         output_io.write(json.dumps(deny_perms, indent=4))
-
-    output_io.close()
 
 
 if __name__ == "__main__":

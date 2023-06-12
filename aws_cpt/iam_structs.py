@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import IO, Dict, List, Tuple
+from typing import Dict, Iterable, List
 
 DATE_FORMAT = r"%Y-%m-%dT%H:%M:%SZ"
 
@@ -24,11 +24,8 @@ def glob_match(pattern: str, data: str) -> bool:
     return True
 
 
-def in_glob(patterns: List[str], data: str) -> bool:
-    for p in patterns:
-        if glob_match(p, data):
-            return True
-    return False
+def in_glob(patterns: Iterable[str], data: str) -> bool:
+    return any(glob_match(p, data) for p in patterns)
 
 
 def _parse_datetime_string(date: str) -> datetime:
