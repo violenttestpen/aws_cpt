@@ -6,7 +6,7 @@ package_name = "aws_cpt"
 
 setup(
     name=package_name,
-    version="1.0",
+    version="1.1",
     description="AWS Cloud Pentest Utility",
     author="ViolentTestPen",
     author_email="violenttestpen@users.noreply.github.com",
