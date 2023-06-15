@@ -21,11 +21,11 @@ def glob_match(pattern: str, data: str) -> bool:
             return False
         index += len(pattern_part)
 
-    return True
+    return (pattern in data) or (data in pattern)
 
 
 def in_glob(patterns: Iterable[str], data: str) -> bool:
-    return any(glob_match(p, data) for p in patterns)
+    return any(glob_match(p, data) or glob_match(data, p) for p in patterns)
 
 
 def _parse_datetime_string(date: str) -> datetime:

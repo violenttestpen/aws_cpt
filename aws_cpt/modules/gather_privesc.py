@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import argparse
 import json
 import sys
 from collections import defaultdict
@@ -181,6 +180,9 @@ def main(args: List[str]):
         )
         for role in roles:
             allow_perms, _ = extract_permissions(role, data)
+            if not allow_perms:
+                continue
+
             for privesc_check in privesc_checks:
                 privesc_perms = privesc_check["perms"]
                 privesc_principal = privesc_check.get("trusted_principal")
@@ -209,12 +211,15 @@ def main(args: List[str]):
                 if p := allow_perms.get(action):
                     rsrcs = p if isinstance(p, list) else [p]
                 else:
-                    rsrcs = next(
-                        r if isinstance(r, list) else [r]
-                        for p in privesc_perms
-                        for a, r in allow_perms.items()
-                        if glob_match(a, p)
-                    )
+                    try:
+                        rsrcs = next(
+                            r if isinstance(r, list) else [r]
+                            for p in privesc_perms
+                            for a, r in allow_perms.items()
+                            if glob_match(a, p)
+                        )
+                    except StopIteration:
+                        rsrcs = []
 
                 for r in rsrcs:
                     principal_group = []

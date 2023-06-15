@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import argparse
 import json
 import sys
 from itertools import chain
@@ -48,16 +47,24 @@ def main(args: List[str]):
     for i, action in {0: "Allow", 1: "Deny"}.items():
         action_node = None
         for role, perms in parse_permissions(data, args.verbose):
-            role_node = None
-            for perm, rsrc in perms[i].items():
-                if not in_glob(args.permission, perm):
-                    continue
+            if not perms[i]:
+                continue
 
+            selected_perms = {
+                perm: rsrc
+                for perm, rsrc in perms[i].items()
+                if in_glob(args.permission, perm)
+            }
+
+            role_node = None
+            for perm, rsrc in selected_perms.items():
                 if action_node is None:
                     action_node = root.add(action)
 
                 if role_node is None:
-                    role_node = action_node.add(role.RoleName)
+                    role_node = action_node.add(
+                        f"{role.RoleName} ({', '.join(selected_perms.keys())})"
+                    )
 
                 if args.verbose:
                     perm_node = role_node.add(perm)

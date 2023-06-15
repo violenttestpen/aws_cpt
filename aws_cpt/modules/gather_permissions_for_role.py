@@ -90,7 +90,7 @@ def process_iam_actions(statements, verbose=False, reverse=False):
             for effect in reverse_perms
         }
 
-    return overall_perms["Allow"], overall_perms["Deny"]
+    return overall_perms.get("Allow"), overall_perms.get("Deny")
 
 
 def extract_permissions(role_name: str, data: Any, verbose=False, reverse=False):
