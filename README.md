@@ -1,6 +1,6 @@
 # AWS Cloud Pentest Utility
 
-Helper scripts for a quicker Cloud PT on AWS environments
+Helper scripts for an easier Cloud PT on AWS environments.
 
 # Installation
 
@@ -62,6 +62,42 @@ Displays known privilege escalation patterns in IAM roles. If the target resourc
 
 ```
 usage: awscpt privesc [-h] [--input INPUT] [--output OUTPUT] [--verbose]
+
+options:
+  -h, --help            show this help message and exit
+  --input INPUT, -i INPUT
+                        The filepath to the output of `iam get-account-authorization-details`
+  --output OUTPUT, -o OUTPUT
+                        The filepath to save the results
+  --verbose, -v         Verbose mode
+```
+
+## resource_exposure
+
+Displays IAM roles with permissions that are known to expose cloud resources.
+
+```
+usage: awscpt.py resource_exposure [-h] [--input INPUT] [--output OUTPUT] [--verbose] [--reverse]
+
+options:
+  -h, --help            show this help message and exit
+  --input INPUT, -i INPUT
+                        The filepath to the output of `iam get-account-authorization-details`
+  --output OUTPUT, -o OUTPUT
+                        The filepath to save the results
+  --verbose, -v         Verbose mode
+  --reverse, -r         Show actions grouped by resources instead
+```
+
+## who_has
+
+Searches for IAM roles that contain the provided permission set.
+
+```
+usage: awscpt.py who_has [-h] [--input INPUT] [--output OUTPUT] [--verbose] permission [permission ...]
+
+positional arguments:
+  permission            Filter using specified permission(s)
 
 options:
   -h, --help            show this help message and exit
