@@ -9,7 +9,7 @@ from typing import Any, List
 from rich.console import Console, Group
 from rich.tree import Tree
 
-from aws_cpt.iam_structs import in_glob
+from aws_cpt.iam_structs import in_glob, in_glob2
 from aws_cpt.modules import create_new_argparser, gather_permissions_for_role
 
 
@@ -53,7 +53,7 @@ def main(args: List[str]):
             selected_perms = {
                 perm: rsrc
                 for perm, rsrc in perms[i].items()
-                if in_glob(args.permission, perm)
+                if in_glob(args.permission, perm) or in_glob2(perm, args.permission)
             }
 
             role_node = None

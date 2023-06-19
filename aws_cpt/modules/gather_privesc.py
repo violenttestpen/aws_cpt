@@ -181,6 +181,7 @@ def main(args: List[str]):
         for role in roles:
             allow_perms, _ = extract_permissions(role, data)
             if not allow_perms:
+                progress.update(task, advance=len(privesc_checks))
                 continue
 
             for privesc_check in privesc_checks:
